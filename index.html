@@ -1,38 +1,56 @@
 <!DOCTYPE html>
-<html lang="id">
-<head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-  <title>Payolah POS</title>
-  
-  <link rel="manifest" href="/manifest.json">
-  <meta name="theme-color" content="#ffffff">
-  
-  <style>
-    body, html {
-      margin: 0;
-      padding: 0;
-      height: 100%;
-      overflow: hidden;
-      background-color: #ffffff;
-    }
-    iframe {
-      width: 100%;
-      height: 100%;
-      border: none;
-    }
-  </style>
-</head>
-<body>
+  <html lang="id">
+  <head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Payolah POS</title>
 
-  <iframe src="https://script.google.com/macros/s/AKfycbxPsNQdeYFWyAvzM9ZNzk2NMsnOjhK8LNaVoOdfhB4XtwCrI5IkqHgDarVV1fwGsM1f-g/exec"></iframe>
+    <link rel="manifest" href="/manifest.json">
+    <meta name="theme-color" content="#ffffff">
 
-  <script>
-    if ('serviceWorker' in navigator) {
-      window.addEventListener('load', () => {
-        navigator.serviceWorker.register('sw.js');
+    <style>
+      body, html { margin:0; padding:0; height:100%; overflow:hidden; background:#ffffff; }
+      iframe { width:100%; height:100%; border:none; display:block; }
+    </style>
+  </head>
+  <body>
+
+    <iframe id="appFrame"
+            allow="clipboard-read; clipboard-write; fullscreen"></iframe>
+
+    <script>
+      var GAS_BASE = 'https://script.google.com/macros/s/AKfycbxPsNQdeYFWyAvzM9ZNzk2NMsnOjhK8LNaVoOdfhB4XtwCrI5IkqHgDarVV1fwGsM1f-g/exec';
+      var frame = document.getElementById('appFrame');
+
+      // Hanya terima URL milik GAS-mu (cegah pesan dari sumber lain)
+      function isGasUrl(u) {
+        return typeof u === 'string' &&
+               u.indexOf('https://script.google.com/macros/s/') === 0;
+      }
+
+      // Muat ulang sesi terakhir (kalau token masih valid → langsung app,
+      // kalau sudah kedaluwarsa → GAS otomatis tampilkan login di dalam iframe).
+      var last = null;
+      try { last = localStorage.getItem('payolah_last'); } catch (e) {}
+      frame.src = (last && isGasUrl(last)) ? last : GAS_BASE;
+
+      // GAS (login/logout/expired) kirim pesan ke sini; KITA yang ganti iframe,
+      // supaya top tetap di Vercel → tetap fullscreen tanpa chrome browser.
+      window.addEventListener('message', function (ev) {
+        var fromGas = ev.origin === 'https://script.google.com' ||
+                      /\.googleusercontent\.com$/.test(ev.origin);
+        if (!fromGas) return;
+        var d = ev.data || {};
+        if (d.type !== 'PAYOLAH_NAV' || !isGasUrl(d.url)) return;
+        frame.src = d.url;
+        try { localStorage.setItem('payolah_last', d.url); } catch (e) {}
       });
-    }
-  </script>
-</body>
-</html>
+
+      if ('serviceWorker' in navigator) {
+        window.addEventListener('load', function () {
+          navigator.serviceWorker.register('/sw.js');
+        });
+      }
+    </script>
+  </body>
+  </html>
